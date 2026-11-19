@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Reno3D - Live House Renovation Preview</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { overflow: hidden; background: #111827; color: #f9fafb; }
+    #panel {
+      position: fixed; top: 16px; left: 16px; width: 280px;
+      background: rgba(17, 24, 39, 0.88); backdrop-filter: blur(10px);
+      border: 1px solid rgba(255,255,255,0.12); border-radius: 14px;
+      padding: 16px; z-index: 10; box-shadow: 0 12px 30px rgba(0,0,0,0.4);
+    }
+    h1 { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+    .sub { font-size: 12px; color: #9ca3af; margin-bottom: 14px; }
+    .section { margin-bottom: 14px; }
+    .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: #9ca3af; margin-bottom: 8px; }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; }
+    button {
+      border: 1px solid rgba(255,255,255,0.16); background: rgba(255,255,255,0.06);
+      color: #f3f4f6; padding: 6px 10px; border-radius: 8px; font-size: 12px;
+      cursor: pointer; transition: 0.15s;
+    }
+    button:hover { background: rgba(255,255,255,0.15); }
+    button.active { background: #3b82f6; border-color: #60a5fa; color: #fff; font-weight: 600; }
+    .swatch { width: 26px; height: 26px; border-radius: 50%; padding: 0; border: 2px solid rgba(255,255,255,0.25); }
+    .swatch.active { border-color: #fff; transform: scale(1.12); }
+    .footer { font-size: 11px; color: #6b7280; margin-top: 8px; }
+  </style>
+</head>
+<body>
+  <div id="panel">
+    <h1>Reno3D Studio (MVP)</h1>
+    <div class="sub">Interactive browser preview for home renovations</div>
+
+    <div class="section">
+      <div class="label">Renovation Mode</div>
+      <div class="row">
+        <button id="btn-after" class="active">After (Remodeled)</button>
+        <button id="btn-before">Before (Original)</button>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="label">Wall Paint</div>
+      <div class="row" id="wall-colors">
+        <button class="swatch active" data-color="#f3efe6" style="background:#f3efe6" title="Warm Alabaster"></button>
+        <button class="swatch" data-color="#cbd5e1" style="background:#cbd5e1" title="Slate Mist"></button>
+        <button class="swatch" data-color="#a7b8a8" style="background:#a7b8a8" title="Sage Green"></button>
+        <button class="swatch" data-color="#334155" style="background:#334155" title="Charcoal Accent"></button>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="label">Floor Material</div>
+      <div class="row" id="floor-types">
+        <button class="active" data-floor="oak">Warm Oak</button>
+        <button data-floor="marble">Marble Tile</button>
+        <button data-floor="concrete">Microcement</button>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="label">Layout Options</div>
+      <div class="row">
+        <button id="btn-wall" class="active">Knock Down Divider Wall</button>
+      </div>
+    </div>
+
+    <div class="footer">Drag to orbit · Scroll to zoom · Right-drag to pan</div>
+  </div>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.170.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.170.0/examples/jsm/"
+      }
+    }
+  </script>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x111827);
+
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+    camera.position.set(8, 6.5, 9);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    document.body.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.target.set(0, 1, 0);
+
+    // Lighting
+    scene.add(new THREE.AmbientLight(0xffffff, 0.65));
+    const sun = new THREE.DirectionalLight(0xfff7ed, 1.4);
+    sun.position.set(6, 10, 6);
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(1024, 1024);
+    scene.add(sun);
+
+    // Floor
+    const floorMat = new THREE.MeshStandardMaterial({ color: 0xc29b6f, roughness: 0.55 });
+    const floor = new THREE.Mesh(new THREE.BoxGeometry(8, 0.2, 6), floorMat);
+    floor.position.y = -0.1;
+    floor.receiveShadow = true;
+    scene.add(floor);
+
+    // Walls
+    const wallMat = new THREE.MeshStandardMaterial({ color: 0xf3efe6, roughness: 0.85 });
+    const backWall = new THREE.Mesh(new THREE.BoxGeometry(8, 3, 0.2), wallMat);
+    backWall.position.set(0, 1.5, -3);
+    backWall.receiveShadow = true;
+    backWall.castShadow = true;
+    scene.add(backWall);
+
+    const leftWall = new THREE.Mesh(new THREE.BoxGeometry(0.2, 3, 6), wallMat);
+    leftWall.position.set(-4, 1.5, 0);
+    leftWall.receiveShadow = true;
+    leftWall.castShadow = true;
+    scene.add(leftWall);
+
+    // Knock-down divider wall
+    const dividerWall = new THREE.Mesh(
+      new THREE.BoxGeometry(0.18, 3, 3.6),
+      new THREE.MeshStandardMaterial({ color: 0xe5e7eb, roughness: 0.9 })
+    );
+    dividerWall.position.set(0.2, 1.5, -1.1);
+    dividerWall.visible = false;
+    dividerWall.castShadow = true;
+    scene.add(dividerWall);
+
+    // Kitchen Island (Remodel feature)
+    const islandGroup = new THREE.Group();
+    const islandBase = new THREE.Mesh(
+      new THREE.BoxGeometry(2.4, 0.9, 1.0),
+      new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.6 })
+    );
+    islandBase.position.y = 0.45;
+    islandBase.castShadow = true;
+    const islandTop = new THREE.Mesh(
+      new THREE.BoxGeometry(2.55, 0.08, 1.15),
+      new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.2 })
+    );
+    islandTop.position.y = 0.94;
+    islandTop.castShadow = true;
+    islandGroup.add(islandBase, islandTop);
+    islandGroup.position.set(1.8, 0, -1.0);
+    scene.add(islandGroup);
+
+    // Sofa
+    const sofaGroup = new THREE.Group();
+    const sofaMat = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.8 });
+    const seat = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.45, 0.95), sofaMat);
+    seat.position.y = 0.225;
+    seat.castShadow = true;
+    const back = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.85, 0.22), sofaMat);
+    back.position.set(0, 0.425, -0.36);
+    back.castShadow = true;
+    sofaGroup.add(seat, back);
+    sofaGroup.position.set(-1.8, 0, -1.8);
+    scene.add(sofaGroup);
+
+    // Coffee Table
+    const table = new THREE.Mesh(
+      new THREE.BoxGeometry(1.2, 0.35, 0.65),
+      new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.5 })
+    );
+    table.position.set(-1.8, 0.175, -0.4);
+    table.castShadow = true;
+    scene.add(table);
+
+    // Rug
+    const rug = new THREE.Mesh(
+      new THREE.BoxGeometry(2.8, 0.02, 2.0),
+      new THREE.MeshStandardMaterial({ color: 0xd6d3d1, roughness: 0.95 })
+    );
+    rug.position.set(-1.8, 0.01, -0.7);
+    rug.receiveShadow = true;
+    scene.add(rug);
+
+    // UI Logic
+    let wallKnockedDown = true;
+    const btnAfter = document.getElementById('btn-after');
+    const btnBefore = document.getElementById('btn-before');
+    const btnWall = document.getElementById('btn-wall');
+
+    btnAfter.onclick = () => {
+      btnAfter.classList.add('active');
+      btnBefore.classList.remove('active');
+      islandGroup.visible = true;
+      rug.visible = true;
+      dividerWall.visible = !wallKnockedDown;
+      floorMat.color.set(0xc29b6f);
+      wallMat.color.set(0xf3efe6);
+    };
+
+    btnBefore.onclick = () => {
+      btnBefore.classList.add('active');
+      btnAfter.classList.remove('active');
+      islandGroup.visible = false;
+      rug.visible = false;
+      dividerWall.visible = true;
+      floorMat.color.set(0x7c5e42);
+      wallMat.color.set(0xd6cfc2);
+    };
+
+    document.querySelectorAll('#wall-colors .swatch').forEach(btn => {
+      btn.onclick = () => {
+        document.querySelectorAll('#wall-colors .swatch').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        wallMat.color.set(btn.dataset.color);
+      };
+    });
+
+    const floorMap = { oak: 0xc29b6f, marble: 0xe5e7eb, concrete: 0x9ca3af };
+    document.querySelectorAll('#floor-types button').forEach(btn => {
+      btn.onclick = () => {
+        document.querySelectorAll('#floor-types button').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        floorMat.color.set(floorMap[btn.dataset.floor]);
+      };
+    });
+
+    btnWall.onclick = () => {
+      wallKnockedDown = !wallKnockedDown;
+      btnWall.classList.toggle('active', wallKnockedDown);
+      dividerWall.visible = !wallKnockedDown;
+    };
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      renderer.render(scene, camera);
+    }
+    animate();
+  </script>
+</body>
+</html>
